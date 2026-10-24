@@ -1890,7 +1890,14 @@ function initAuthHandlers() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password, role })
         });
-        const data = await res.json();
+
+        let data = {};
+        const resText = await res.text();
+        try {
+          data = JSON.parse(resText);
+        } catch (e) {
+          throw new Error(`Server response error (${res.status}): ${resText.slice(0, 150)}`);
+        }
 
         if (!res.ok) {
           throw new Error(data.error || 'Authentication failed. Please verify credentials.');
@@ -1970,7 +1977,14 @@ function initAuthHandlers() {
             mobile
           })
         });
-        const data = await res.json();
+
+        let data = {};
+        const resText = await res.text();
+        try {
+          data = JSON.parse(resText);
+        } catch (e) {
+          throw new Error(`Server response error (${res.status}): ${resText.slice(0, 150)}`);
+        }
 
         if (!res.ok) {
           throw new Error(data.error || 'Registration failed.');

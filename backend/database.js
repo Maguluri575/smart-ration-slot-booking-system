@@ -1,9 +1,10 @@
 let sqlite3 = null;
-try {
-  sqlite3 = require('sqlite3').verbose();
-} catch (e) {
-  // Gracefully handle environments (like serverless Vercel) where native sqlite3 addon is not available
-  console.warn("Notice: sqlite3 binary not loaded in current environment:", e.message);
+if (!process.env.VERCEL) {
+  try {
+    sqlite3 = require('sqlite3').verbose();
+  } catch (e) {
+    console.warn("Notice: sqlite3 binary not loaded in current environment:", e.message);
+  }
 }
 
 const { createClient } = require('@supabase/supabase-js');
@@ -46,22 +47,30 @@ if (useSupabase) {
   if (process.env.SUPABASE_URL && isPlaceholderKey(process.env.SUPABASE_KEY)) {
     console.log("Notice: Supabase credentials contain a placeholder key. Operating on local SQLite until actual Supabase key is provided in .env.");
   }
-  if (sqlite3) {
+  if (!process.env.VERCEL && sqlite3) {
     console.log(`Database Mode: SQLite (${dbPath})`);
     try {
-      sqliteDb = new sqlite3.Database(dbPath);
+      sqliteDb = new sqlite3.Database(dbPath, (err) => {
+        if (err) {
+          console.warn("Could not open local SQLite database:", err.message);
+          sqliteDb = null;
+        }
+      });
     } catch (e) {
       console.warn("Could not open local SQLite database:", e.message);
+      sqliteDb = null;
     }
   } else {
-    console.warn("Notice: SQLite is unavailable in this environment and Supabase credentials are not configured.");
+    console.warn("Notice: SQLite is disabled in this environment. Supabase credentials (SUPABASE_URL, SUPABASE_KEY) are required.");
   }
 }
 
 // Promisify SQLite helpers (guarded for safety if sqliteDb is disconnected)
 const dbRun = (sql, params = []) => {
   return new Promise((resolve, reject) => {
-    if (!sqliteDb) return resolve({ id: 0, changes: 0 });
+    if (!sqliteDb) {
+      return reject(new Error("Database not connected. Please ensure SUPABASE_URL and SUPABASE_KEY are configured in your Vercel Environment Variables."));
+    }
     sqliteDb.run(sql, params, function (err) {
       if (err) reject(err);
       else resolve({ id: this.lastID, changes: this.changes });
@@ -71,7 +80,9 @@ const dbRun = (sql, params = []) => {
 
 const dbGet = (sql, params = []) => {
   return new Promise((resolve, reject) => {
-    if (!sqliteDb) return resolve(null);
+    if (!sqliteDb) {
+      return reject(new Error("Database not connected. Please ensure SUPABASE_URL and SUPABASE_KEY are configured in your Vercel Environment Variables."));
+    }
     sqliteDb.get(sql, params, (err, row) => {
       if (err) reject(err);
       else resolve(row);
@@ -81,7 +92,9 @@ const dbGet = (sql, params = []) => {
 
 const dbAll = (sql, params = []) => {
   return new Promise((resolve, reject) => {
-    if (!sqliteDb) return resolve([]);
+    if (!sqliteDb) {
+      return reject(new Error("Database not connected. Please ensure SUPABASE_URL and SUPABASE_KEY are configured in your Vercel Environment Variables."));
+    }
     sqliteDb.all(sql, params, (err, rows) => {
       if (err) reject(err);
       else resolve(rows);
@@ -93,9 +106,14 @@ const dbAll = (sql, params = []) => {
 async function initDb() {
   if (useSupabase) {
     console.log("Supabase connection active. Database tables should be initialized via Supabase SQL dashboard. Running connectivity check...");
-    // Just run a simple check, we will provide supabase_schema.sql for the user.
     return;
   }
+
+  if (process.env.VERCEL || !sqliteDb) {
+    console.warn("Notice: Skipping SQLite schema initialization on Vercel Serverless.");
+    return;
+  }
+
 
   console.log("Initializing SQLite Database Schema...");
   
