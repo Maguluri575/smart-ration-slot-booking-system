@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart PDS | Public Distribution System Portal</title>
+  <meta name="description" content="India's Smart Public Distribution System — Select your portal to access citizen ration services, dealer management, or government administration.">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Core Component Styles for Chatbot & Modals -->
+  <link rel="stylesheet" href="styles.css">
+
+  <style>
+    /* =========================================
+       CSS VARIABLES & RESET
+    ========================================= */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --font-title: 'Outfit', sans-serif;
+      --font-body: 'Inter', sans-serif;
+
+      --bg-deep: #060b14;
+      --bg-dark: #0b1525;
+      --bg-card: rgba(255, 255, 255, 0.04);
+      --bg-card-hover: rgba(255, 255, 255, 0.08);
+
+      --citizen-primary: #3b82f6;
+      --citizen-secondary: #60a5fa;
+      --citizen-glow: rgba(59, 130, 246, 0.35);
+      --citizen-border: rgba(59, 130, 246, 0.4);
+
+      --dealer-primary: #10b981;
+      --dealer-secondary: #34d399;
+      --dealer-glow: rgba(16, 185, 129, 0.35);
+      --dealer-border: rgba(16, 185, 129, 0.4);
+
+      --gov-primary: #f59e0b;
+      --gov-secondary: #fbbf24;
+      --gov-glow: rgba(245, 158, 11, 0.35);
+      --gov-border: rgba(245, 158, 11, 0.4);
+
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #475569;
+
+      --radius-xl: 28px;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: var(--font-body);
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      overflow-x: hidden;
+    }
+
+    .bg-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .bg-canvas::before {
+      content: '';
+      position: absolute;
+      width: 800px;
+      height: 800px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, transparent 70%);
+      top: -200px;
+      left: -200px;
+      animation: floatOrb1 18s ease-in-out infinite;
+    }
+
+    .bg-canvas::after {
+      content: '';
+      position: absolute;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(245, 158, 11, 0.10) 0%, transparent 70%);
+      bottom: -150px;
+      right: -150px;
+      animation: floatOrb2 22s ease-in-out infinite;
+    }
+
+    .bg-orb3 {
+      position: fixed;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.10) 0%, transparent 70%);
+      bottom: 20%;
+      left: 30%;
+      animation: floatOrb3 26s ease-in-out infinite;
+      z-index: 0;
+    }
+
+    @keyframes floatOrb1 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(60px, 80px) scale(1.1); }
+      66% { transform: translate(-40px, 50px) scale(0.95); }
+    }
+    @keyframes floatOrb2 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      40% { transform: translate(-70px, -60px) scale(1.12); }
+      70% { transform: translate(50px, -30px) scale(0.9); }
+    }
+    @keyframes floatOrb3 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(-80px, 60px) scale(1.15); }
+    }
+
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 60px 60px;
+      z-index: 0;
+    }
+
+    .gov-stripe {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      background: linear-gradient(90deg, #ff6600, #ff9933, #ffffff, #138808, #000080);
+      background-size: 400% 100%;
+      height: 4px;
+      animation: stripeAnim 8s linear infinite;
+    }
+
+    @keyframes stripeAnim {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 400% 50%; }
+    }
+
+    .page-wrapper {
+      position: relative;
+      z-index: 5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1.5rem 2rem;
+    }
+
+    .site-header {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.5rem 0;
+    }
+
+    .logo-group {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+
+    .logo-icon-badge {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #1e40af, #3b82f6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-title);
+      font-weight: 800;
+      font-size: 0.9rem;
+      color: #fff;
+      letter-spacing: 1px;
+      box-shadow: 0 4px 16px rgba(59,130,246,0.4);
+    }
+
+    .logo-text-group h1 {
+      font-family: var(--font-title);
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.1;
+    }
+
+    .logo-text-group span {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      font-weight: 400;
+      letter-spacing: 0.5px;
+    }
+
+
+    .landing-lang-select {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 100px;
+      padding: 0.45rem 0.95rem;
+      color: #f8fafc;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+    .landing-lang-select:hover {
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+    .landing-lang-select option {
+      background: #0b1525;
+      color: #f8fafc;
+    }
+
+    .header-badge {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 100px;
+      padding: 0.45rem 1.1rem;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      background: #22c55e;
+      border-radius: 50%;
+      animation: pulse-dot 2s ease infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(0.8); }
+    }
+
+    .hero {
+      width: 100%;
+      max-width: 1200px;
+      text-align: center;
+      padding: 3rem 0 2.5rem;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(59, 130, 246, 0.12);
+      border: 1px solid rgba(59, 130, 246, 0.28);
+      border-radius: 100px;
+      padding: 0.4rem 1.1rem;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: #93c5fd;
+      letter-spacing: 0.5px;
+      margin-bottom: 1.5rem;
+      animation: fadeSlideUp 0.5s ease both;
+    }
+
+    .hero h2 {
+      font-family: var(--font-title);
+      font-size: clamp(2.2rem, 5vw, 3.6rem);
+      font-weight: 800;
+      line-height: 1.1;
+      color: #fff;
+      margin-bottom: 1rem;
+      animation: fadeSlideUp 0.6s ease both;
+    }
+
+    .hero h2 .highlight {
+      background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero p {
+      font-size: 1.05rem;
+      color: var(--text-secondary);
+      max-width: 540px;
+      margin: 0 auto 0.5rem;
+      line-height: 1.65;
+      animation: fadeSlideUp 0.7s ease both;
+    }
+
+    .hero-stats {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2.5rem;
+      margin-top: 2rem;
+      animation: fadeSlideUp 0.8s ease both;
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-item .stat-value {
+      font-family: var(--font-title);
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .stat-item .stat-label {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-top: 0.1rem;
+    }
+
+    .stat-divider {
+      width: 1px;
+      height: 32px;
+      background: rgba(255,255,255,0.12);
+    }
+
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .section-label {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      animation: fadeSlideUp 0.8s ease both;
+    }
+
+    .section-label span {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.1), transparent);
+    }
+
+    .portals-grid {
+      width: 100%;
+      max-width: 1200px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      animation: fadeSlideUp 0.9s ease both;
+    }
+
+    .portal-card {
+      position: relative;
+      background: var(--bg-card);
+      border-radius: var(--radius-xl);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 2.5rem 2rem 2rem;
+      cursor: pointer;
+      text-decoration: none;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      overflow: hidden;
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  border-color 0.3s ease,
+                  background 0.3s ease,
+                  box-shadow 0.3s ease;
+      backdrop-filter: blur(12px);
+    }
+
+    .portal-card.citizen {
+      --card-primary: var(--citizen-primary);
+      --card-secondary: var(--citizen-secondary);
+      --card-glow: var(--citizen-glow);
+      --card-border: var(--citizen-border);
+    }
+    .portal-card.dealer {
+      --card-primary: var(--dealer-primary);
+      --card-secondary: var(--dealer-secondary);
+      --card-glow: var(--dealer-glow);
+      --card-border: var(--dealer-border);
+    }
+    .portal-card.government {
+      --card-primary: var(--gov-primary);
+      --card-secondary: var(--gov-secondary);
+      --card-glow: var(--gov-glow);
+      --card-border: var(--gov-border);
+    }
+
+    .portal-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--card-primary), var(--card-secondary));
+      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .portal-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: var(--radius-xl);
+      background: radial-gradient(circle at 50% 0%, var(--card-glow) 0%, transparent 65%);
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+
+    .portal-card:hover {
+      transform: translateY(-8px) scale(1.02);
+      border-color: var(--card-border);
+      background: var(--bg-card-hover);
+      box-shadow: 0 24px 60px var(--card-glow), 0 0 0 1px var(--card-border);
+    }
+
+    .portal-card:hover::before { opacity: 1; }
+    .portal-card:hover::after { opacity: 1; }
+
+    .portal-card:active {
+      transform: translateY(-4px) scale(0.99);
+    }
+
+    .portal-icon-wrap {
+      position: relative;
+      z-index: 2;
+      width: 64px;
+      height: 64px;
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      font-size: 1.6rem;
+      transition: transform 0.3s ease, background 0.3s ease;
+    }
+
+    .portal-card.citizen .portal-icon-wrap { color: var(--citizen-secondary); }
+    .portal-card.dealer .portal-icon-wrap { color: var(--dealer-secondary); }
+    .portal-card.government .portal-icon-wrap { color: var(--gov-secondary); }
+
+    .portal-card:hover .portal-icon-wrap {
+      transform: scale(1.1) rotate(-5deg);
+      background: rgba(255,255,255,0.1);
+    }
+
+    .portal-tag {
+      position: relative;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 0.3rem 0.75rem;
+      border-radius: 100px;
+      margin-bottom: 0.75rem;
+    }
+
+    .portal-card.citizen .portal-tag {
+      background: rgba(59, 130, 246, 0.15);
+      color: #93c5fd;
+      border: 1px solid rgba(59, 130, 246, 0.25);
+    }
+    .portal-card.dealer .portal-tag {
+      background: rgba(16, 185, 129, 0.15);
+      color: #6ee7b7;
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+    .portal-card.government .portal-tag {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fcd34d;
+      border: 1px solid rgba(245, 158, 11, 0.25);
+    }
+
+    .portal-title {
+      position: relative;
+      z-index: 2;
+      font-family: var(--font-title);
+      font-size: 1.55rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 0.6rem;
+      line-height: 1.2;
+    }
+
+    .portal-subtitle {
+      position: relative;
+      z-index: 2;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      line-height: 1.55;
+      margin-bottom: 1.8rem;
+      flex: 1;
+    }
+
+    .portal-features {
+      position: relative;
+      z-index: 2;
+      list-style: none;
+      width: 100%;
+      margin-bottom: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+    }
+
+    .portal-features li {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.82rem;
+      color: #94a3b8;
+    }
+
+    .feature-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 0.55rem;
+    }
+
+    .portal-card.citizen .feature-icon { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+    .portal-card.dealer .feature-icon { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+    .portal-card.government .feature-icon { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+
+    .portal-cta {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      padding: 0.875rem 1.5rem;
+      border-radius: 14px;
+      border: none;
+      font-family: var(--font-title);
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      transition: all 0.25s ease;
+      text-decoration: none;
+    }
+
+    .portal-card.citizen .portal-cta {
+      background: linear-gradient(135deg, #1e40af, #3b82f6);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(59, 130, 246, 0.35);
+    }
+    .portal-card.dealer .portal-cta {
+      background: linear-gradient(135deg, #065f46, #10b981);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(16, 185, 129, 0.35);
+    }
+    .portal-card.government .portal-cta {
+      background: linear-gradient(135deg, #92400e, #f59e0b);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(245, 158, 11, 0.35);
+    }
+
+    .portal-cta:hover { filter: brightness(1.12); }
+
+    .arrow-icon {
+      transition: transform 0.25s ease;
+    }
+    .portal-card:hover .arrow-icon {
+      transform: translateX(4px);
+    }
+
+    .ticker-wrap {
+      width: 100%;
+      max-width: 1200px;
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      margin-top: 2rem;
+      animation: fadeSlideUp 1s ease both;
+    }
+
+    .ticker-label {
+      background: rgba(245, 158, 11, 0.2);
+      padding: 0.55rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #fbbf24;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      white-space: nowrap;
+      border-right: 1px solid rgba(245, 158, 11, 0.2);
+      flex-shrink: 0;
+    }
+
+    .ticker-content {
+      flex: 1;
+      overflow: hidden;
+      padding: 0.55rem 0;
+    }
+
+    .ticker-text {
+      display: inline-block;
+      white-space: nowrap;
+      font-size: 0.82rem;
+      color: #94a3b8;
+      animation: ticker-scroll 30s linear infinite;
+      padding-left: 100%;
+    }
+
+    @keyframes ticker-scroll {
+      from { transform: translateX(0); }
+      to { transform: translateX(-100%); }
+    }
+
+    .site-footer {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 2rem;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      margin-top: 2rem;
+    }
+
+    .footer-left {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .footer-right {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .footer-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    .particles {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .particle {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.4);
+      animation: floatParticle linear infinite;
+    }
+
+    @keyframes floatParticle {
+      0% { transform: translateY(100vh) translateX(0); opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 0.5; }
+      100% { transform: translateY(-10vh) translateX(var(--drift)); opacity: 0; }
+    }
+
+    @keyframes rippleAnim {
+      to { transform: scale(1); opacity: 0; }
+    }
+
+    @media (max-width: 900px) {
+      .portals-grid { grid-template-columns: 1fr; max-width: 480px; }
+      .hero-stats { gap: 1.5rem; }
+    }
+
+    @media (max-width: 600px) {
+      .hero h2 { font-size: 2rem; }
+      .site-header { flex-direction: column; gap: 1rem; align-items: flex-start; }
+      .portals-grid { gap: 1rem; }
+      .portal-card { padding: 1.75rem 1.5rem 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg-canvas"></div>
+  <div class="bg-grid"></div>
+  <div class="bg-orb3"></div>
+  <div class="particles" id="particles-container"></div>
+
+  <!-- Indian Flag Color Stripe -->
+  <div class="gov-stripe"></div>
+
+  <div class="page-wrapper">
+
+    <!-- HEADER -->
+    <header class="site-header">
+      <div class="logo-group">
+        <div class="logo-icon-badge">PDS</div>
+        <div class="logo-text-group">
+          <h1 data-i18n="header_title">SMART PDS</h1>
+          <span data-i18n="header_subtitle">Govt. Public Distribution System</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <select class="landing-lang-select" id="landing-language-select">
+          <option value="en">English</option>
+          <option value="hi">हिंदी (Hindi)</option>
+          <option value="te">తెలుగు (Telugu)</option>
+        </select>
+        <div class="header-badge">
+          <div class="status-dot"></div>
+          <span data-i18n="system_online">System Online · All Services Active</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-eyebrow">
+        <i class="fas fa-shield-halved"></i>
+        <span data-i18n="hero_eyebrow">Digital India Initiative · Ministry of Consumer Affairs</span>
+      </div>
+      <h2>
+        <span data-i18n="hero_title">India's Smart Ration Distribution Portal</span>
+      </h2>
+      <p data-i18n="hero_subtitle">
+        A unified digital platform for citizens, licensed dealers, and government officers to manage Public Distribution System services with transparency and efficiency.
+      </p>
+    </section>
+
+    <!-- SELECT PORTAL LABEL -->
+    <div class="section-label">
+      <span data-i18n="select_portal_heading">Select Your Portal to Continue</span>
+    </div>
+
+    <!-- PORTAL CARDS -->
+    <div class="portals-grid" role="navigation" aria-label="Portal Selection">
+
+      <!-- CITIZEN / USER PORTAL -->
+      <a class="portal-card citizen" href="index.html?role=beneficiary" id="citizen-portal-card" aria-label="Open Citizen User Portal">
+        <div class="portal-icon-wrap">
+          <i class="fas fa-users"></i>
+        </div>
+        <span class="portal-tag"><i class="fas fa-circle-check"></i> <span data-i18n="citizen_portal_tag">Citizen</span></span>
+        <h3 class="portal-title" data-i18n="citizen_portal_title">User Portal</h3>
+
+        <span class="portal-cta">
+          <span data-i18n="citizen_portal_cta">Access Citizen Portal</span>
+          <i class="fas fa-arrow-right arrow-icon"></i>
+        </span>
+      </a>
+
+      <!-- DEALER PORTAL -->
+      <a class="portal-card dealer" href="index.html?role=dealer" id="dealer-portal-card" aria-label="Open Dealer Portal">
+        <div class="portal-icon-wrap">
+          <i class="fas fa-store"></i>
+        </div>
+        <span class="portal-tag"><i class="fas fa-circle-check"></i> <span data-i18n="dealer_portal_tag">Licensed Dealer</span></span>
+        <h3 class="portal-title" data-i18n="dealer_portal_title">Dealer Portal</h3>
+
+        <span class="portal-cta">
+          <span data-i18n="dealer_portal_cta">Access Dealer Portal</span>
+          <i class="fas fa-arrow-right arrow-icon"></i>
+        </span>
+      </a>
+
+      <!-- GOVERNMENT PORTAL -->
+      <a class="portal-card government" href="index.html?role=admin" id="government-portal-card" aria-label="Open Government Portal">
+        <div class="portal-icon-wrap">
+          <i class="fas fa-landmark"></i>
+        </div>
+        <span class="portal-tag"><i class="fas fa-circle-check"></i> <span data-i18n="gov_portal_tag">Govt. Admin</span></span>
+        <h3 class="portal-title" data-i18n="gov_portal_title">Government Portal</h3>
+
+        <span class="portal-cta">
+          <span data-i18n="gov_portal_cta">Access Govt. Portal</span>
+          <i class="fas fa-arrow-right arrow-icon"></i>
+        </span>
+      </a>
+
+    </div>
+
+    <!-- ANNOUNCEMENT TICKER -->
+    <div class="ticker-wrap">
+      <div class="ticker-label">
+        <i class="fas fa-bullhorn"></i>
+        <span data-i18n="notice_tag">NOTICE</span>
+      </div>
+      <div class="ticker-content">
+        <span class="ticker-text" data-i18n="announcement_text">
+          Notice: Special allocation of supplementary oil and wheat distribution is now open for all AAY card holders until the 31st of August. Book slots now!
+        </span>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="site-footer">
+      <div class="footer-left" data-i18n="footer_rights">
+        &copy; 2024 Government of India &mdash; Ministry of Consumer Affairs, Food &amp; Public Distribution
+      </div>
+      <div class="footer-right">
+        <div class="footer-badge"><i class="fas fa-lock" style="color:#22c55e"></i> <span data-i18n="ssl_secured">SSL Secured</span></div>
+        <div class="footer-badge"><i class="fas fa-mobile-screen" style="color:#3b82f6"></i> <span data-i18n="pwa_ready">PWA Ready</span></div>
+        <div class="footer-badge"><i class="fas fa-brain" style="color:#a78bfa"></i> <span data-i18n="ai_enabled">AI-Enabled</span></div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- ========================================== -->
+  <!-- REAL-TIME AI ASSISTANT (PDS SAHAYAK) -->
+  <!-- ========================================== -->
+  <div class="chatbot-trigger" id="chat-trigger-btn" title="PDS Sahayak (AI Assistant)">
+    <i class="fas fa-robot"></i>
+  </div>
+
+  <div class="chat-window" id="chat-window-box">
+    <div class="chat-header">
+      <div class="chat-header-title-box">
+        <h3><i class="fas fa-robot"></i> <span data-i18n="bot_title">PDS Sahayak (AI Assistant)</span></h3>
+        <span class="chat-live-badge"><span class="chat-live-pulse"></span> Live 24x7</span>
+      </div>
+      <button class="control-btn" id="close-chat-btn" style="color: white; background: none; border: none; font-size: 1.1rem; cursor: pointer;"><i class="fas fa-times"></i></button>
+    </div>
+    
+    <div class="chat-messages" id="chat-messages-container">
+      <!-- Dynamic greeting rendered by chatbot.js -->
+    </div>
+
+    <!-- Quick Reply Buttons -->
+    <div class="chat-quick-replies" id="chat-quick-replies-box">
+      <!-- Loaded dynamically based on language -->
+    </div>
+
+    <!-- Free-text query form with speech recognition -->
+    <form class="chat-input-area" id="chat-input-form">
+      <button type="button" class="chat-mic-btn" id="chat-mic-btn" title="Speak your query in real-time">
+        <i class="fas fa-microphone"></i>
+      </button>
+      <input type="text" id="chat-input-text" class="form-control" placeholder="Ask any doubt in English, Hindi, or Telugu..." required autocomplete="off" style="flex-grow: 1; padding: 0.55rem 0.85rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.85rem; outline: none;">
+      <button type="submit" class="btn-primary" style="width: auto; padding: 0.5rem 1rem; border-radius: 8px; background: #3b82f6; color: #fff; border: none; cursor: pointer;" title="Send"><i class="fas fa-paper-plane"></i></button>
+    </form>
+  </div>
+
+  <!-- Multilingual & Global Navigation Engine -->
+  <script src="i18n.js"></script>
+  <!-- Real-Time AI Assistant Engine -->
+  <script src="chatbot.js"></script>
+
+  <script>
+    // Generate floating particles
+    (function() {
+      const container = document.getElementById('particles-container');
+      for (let i = 0; i < 30; i++) {
+        const p = document.createElement('div');
+        p.classList.add('particle');
+        const drift = (Math.random() - 0.5) * 200;
+        const size = 1 + Math.random() * 3;
+        p.style.cssText = [
+          'left:' + (Math.random() * 100) + '%',
+          'bottom:-10px',
+          'width:' + size + 'px',
+          'height:' + size + 'px',
+          'animation-duration:' + (12 + Math.random() * 20) + 's',
+          'animation-delay:-' + (Math.random() * 20) + 's',
+          '--drift:' + drift + 'px',
+          'opacity:' + (0.2 + Math.random() * 0.5)
+        ].join(';');
+        container.appendChild(p);
+      }
+    })();
+
+    // Ripple effect and clean session on card click
+    document.querySelectorAll('.portal-card').forEach(function(card) {
+      card.addEventListener('click', function(e) {
+        // Clear active session to always show that portal's dedicated login page first
+        localStorage.removeItem('pds_token');
+        localStorage.removeItem('pds_user');
+
+        var rect = card.getBoundingClientRect();
+        var size = Math.max(rect.width, rect.height) * 2;
+        var ripple = document.createElement('span');
+        ripple.style.cssText = [
+          'position:absolute',
+          'width:' + size + 'px',
+          'height:' + size + 'px',
+          'border-radius:50%',
+          'background:rgba(255,255,255,0.08)',
+          'left:' + (e.clientX - rect.left - size/2) + 'px',
+          'top:' + (e.clientY - rect.top - size/2) + 'px',
+          'transform:scale(0)',
+          'animation:rippleAnim 0.6s ease-out forwards',
+          'pointer-events:none',
+          'z-index:1'
+        ].join(';');
+        card.appendChild(ripple);
+        setTimeout(function() { ripple.remove(); }, 700);
+      });
+    });
+  </script>
+
+</body>
+</html>

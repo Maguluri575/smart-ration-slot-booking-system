@@ -1,0 +1,31 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Local portable Node.js and downloads
+.node-bin/
+node_portable.zip
+node_temp/
+
+# Python virtual environment & cache
+venv/
+__pycache__/
+*.pyc
+
+# Local SQLite databases & logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

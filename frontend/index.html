@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Ration Slot Booking & PDS Management System</title>
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="A comprehensive digital queue booking and inventory management platform for the Public Distribution System (PDS), supporting smart booking slots, QR check-ins, and analytics.">
+  
+  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json">
+  <!-- PWA Theme Color -->
+  <meta name="theme-color" content="#1e3a8a">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Socket.IO (served locally from backend to avoid CDN failures) -->
+  <script src="/socket.io/socket.io.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- QRCode.js (CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Html5-Qrcode (CDN Scanner) -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <!-- TensorFlow.js + COCO-SSD for Live Crowd Monitoring -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+</head>
+<body>
+
+  <!-- Top Government Brand Stripe -->
+  <div class="gov-banner"></div>
+
+  <!-- Connection Status Indicator (PWA feature) -->
+  <div id="offline-indicator" class="offline-banner">
+    <i class="fas fa-wifi-slash"></i> <span data-i18n="offline_mode">You are currently offline. Running in offline-cached mode.</span>
+  </div>
+
+  <!-- Emergency Announcement Banner -->
+  <div class="emergency-banner" id="announcement-banner">
+    <i class="fas fa-bullhorn"></i>
+    <marquee behavior="scroll" direction="left" data-i18n="announcement_text">
+      Notice: Special allocation of supplementary oil and wheat distribution is now open for all AAY card holders until the 31st of August. Book slots now!
+    </marquee>
+  </div>
+
+  <!-- Header Navigation -->
+  <header class="main-header">
+    <div style="display: flex; align-items: center; gap: 0.85rem;">
+      <!-- Universal Back Navigation Button -->
+      <button class="nav-back-btn" id="global-back-btn" title="Go to Previous Page">
+        <i class="fas fa-arrow-left"></i> <span data-i18n="back_btn">Back</span>
+      </button>
+
+      <div class="logo-container">
+        <div class="logo-icon">PDS</div>
+        <div class="logo-text">
+          <h1 data-i18n="header_title">SMART PDS</h1>
+          <p data-i18n="header_subtitle">Govt. Public Distribution System</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-controls">
+      <!-- Theme Switcher -->
+      <button class="control-btn" id="theme-toggle-btn" title="Toggle Light/Dark Theme">
+        <i class="fas fa-moon"></i>
+      </button>
+
+      <!-- Language Selector -->
+      <select class="lang-select" id="language-select">
+        <option value="en">English</option>
+        <option value="hi">हिंदी (Hindi)</option>
+        <option value="te">తెలుగు (Telugu)</option>
+      </select>
+
+      <!-- Notification Bell -->
+      <div class="notification-bell" id="notification-bell-btn">
+        <i class="fas fa-bell fa-lg text-secondary"></i>
+        <div class="bell-badge" id="notification-badge" style="display: none;">0</div>
+        <!-- Notification Dropdown -->
+        <div class="notification-dropdown" id="notification-panel">
+          <div class="notification-header" data-i18n="notifications_title">Notifications</div>
+          <div class="notification-list" id="notification-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Logout Button (Shown when logged in) -->
+      <button class="control-btn" id="logout-btn" style="display: none;" data-i18n="logout">
+        <i class="fas fa-sign-out-alt"></i> Logout
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="container" id="app-container">
+    
+    <!-- ========================================== -->
+    <!-- AUTHENTICATION & LOGIN SECTION (ALL 3 PORTALS) -->
+    <!-- ========================================== -->
+    <section id="auth-section">
+      <div style="max-width: 520px; margin: 0.5rem auto 1.25rem auto; display: flex; justify-content: space-between; align-items: center;">
+        <a href="landing.html" class="auth-back-link">
+          <i class="fas fa-arrow-left"></i> Back to Portal Hub
+        </a>
+        <span style="font-size: 0.8rem; color: var(--text-muted);"><i class="fas fa-shield-alt"></i> SSL 256-bit Encrypted</span>
+      </div>
+
+      <div class="auth-wrapper portal-citizen" id="auth-wrapper-box">
+        <!-- Portal Selector / Dedicated Active Portal Indicator -->
+        <div class="role-selector-tab" id="auth-role-tabs">
+          <div class="role-tab active" data-role="beneficiary" id="tab-role-beneficiary">
+            <i class="fas fa-users"></i> Citizen (User) Portal
+          </div>
+          <div class="role-tab active" data-role="dealer" id="tab-role-dealer" style="display: none;">
+            <i class="fas fa-store"></i> FPS Dealer Portal
+          </div>
+          <div class="role-tab active" data-role="admin" id="tab-role-admin" style="display: none;">
+            <i class="fas fa-landmark"></i> Government Admin Portal
+          </div>
+        </div>
+
+        <!-- Dynamic Portal Badge & Header -->
+        <div class="auth-header">
+          <div id="auth-portal-badge" class="portal-badge citizen">
+            <i class="fas fa-users"></i> Citizen PDS Portal
+          </div>
+          <h2 id="auth-title">Citizen Login</h2>
+          <p id="auth-subtitle">Enter your Ration Card Number and Password to access your ration booking services.</p>
+        </div>
+
+        <!-- Alert / Notification Message -->
+        <div id="auth-alert" style="display: none; padding: 0.75rem 1rem; border-radius: var(--radius-sm); margin-bottom: 1.25rem; font-size: 0.88rem;"></div>
+
+        <!-- 1. LOGIN FORM -->
+        <div id="login-form-container">
+          <form id="login-form">
+            <div class="form-group">
+              <label id="username-label" for="login-username"><i class="fas fa-id-card"></i> Ration Card Number</label>
+              <input type="text" class="form-control" id="login-username" placeholder="e.g. RATION999" required autocomplete="username">
+            </div>
+
+            <div class="form-group">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                <label for="login-password" style="margin-bottom: 0;"><i class="fas fa-lock"></i> <span data-i18n="label_password">Password</span></label>
+                <a href="#" id="forgot-password-link" class="forgot-link" style="font-size: 0.8rem;" data-i18n="forgot_password">Forgot Password?</a>
+              </div>
+              <input type="password" class="form-control" id="login-password" placeholder="Enter your password" data-i18n-placeholder="placeholder_password" required autocomplete="current-password">
+            </div>
+
+            <!-- Demo Quick-fill Pill (Hidden strictly on user login page) -->
+            <div class="demo-credentials-pill" id="demo-creds-box" style="display: none;">
+              <span style="font-size: 0.75rem; color: var(--text-muted);"><i class="fas fa-key"></i> <span data-i18n="quick_fill">Quick Fill:</span></span>
+              <button type="button" class="demo-pill-btn" id="demo-fill-btn">RATION999 / password</button>
+            </div>
+
+            <!-- Official Notice for Dealer and Government -->
+            <div id="portal-notice-box" class="portal-notice-card" style="display: none;"></div>
+
+            <button type="submit" class="btn-primary" id="login-submit-btn" style="margin-top: 1.25rem;">
+              <i class="fas fa-sign-in-alt"></i> <span id="login-btn-text">Sign In to Citizen Portal</span>
+            </button>
+          </form>
+
+          <!-- Registration Link (Strictly visible ONLY for Citizen/Beneficiary) -->
+          <div id="register-footer-prompt" class="auth-footer">
+            <span data-i18n="new_to_pds">New to Smart PDS?</span>
+            <a href="#" id="open-register-btn" style="font-weight: 700; margin-left: 0.35rem;">
+              <i class="fas fa-user-plus"></i> <span data-i18n="register_now">Register Now</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- 2. CITIZEN REGISTRATION FORM (Visible only for Citizen when 'Register Now' is clicked) -->
+        <div id="register-form-container" style="display: none;">
+          <form id="citizen-register-form">
+            <div class="form-group">
+              <label for="reg-ration-number"><i class="fas fa-id-card"></i> <span data-i18n="label_reg_ration">Ration Card Number *</span></label>
+              <input type="text" class="form-control" id="reg-ration-number" placeholder="e.g. RATION5555 or QN12345678" data-i18n-placeholder="placeholder_ration_card" required>
+              <small style="color: var(--text-muted); font-size: 0.75rem;" data-i18n="hint_reg_ration">Enter your official state ration card number</small>
+            </div>
+
+            <div class="form-group">
+              <label for="reg-full-name"><i class="fas fa-user"></i> <span data-i18n="label_full_name">Full Name (Head of Family) *</span></label>
+              <input type="text" class="form-control" id="reg-full-name" placeholder="e.g. Ramesh Kumar" data-i18n-placeholder="placeholder_full_name" required>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="reg-password"><i class="fas fa-lock"></i> <span data-i18n="label_create_pass">Create Password *</span></label>
+                <input type="password" class="form-control" id="reg-password" placeholder="Min 6 chars" data-i18n-placeholder="placeholder_create_pass" required minlength="6">
+              </div>
+              <div class="form-group">
+                <label for="reg-confirm-password"><i class="fas fa-shield-alt"></i> <span data-i18n="label_confirm_pass">Confirm Password *</span></label>
+                <input type="password" class="form-control" id="reg-confirm-password" placeholder="Re-enter password" data-i18n-placeholder="placeholder_confirm_pass" required minlength="6">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="reg-mobile"><i class="fas fa-phone"></i> <span data-i18n="label_mobile">Mobile Number</span></label>
+              <input type="tel" class="form-control" id="reg-mobile" placeholder="e.g. 9876543210" data-i18n-placeholder="placeholder_mobile" pattern="[0-9]{10}">
+              <small style="color: var(--text-muted); font-size: 0.75rem;" data-i18n="mobile_hint">Used for OTP verification and slot notifications</small>
+            </div>
+
+            <button type="submit" class="btn-primary" id="register-submit-btn" style="margin-top: 1rem;">
+              <i class="fas fa-user-check"></i> <span data-i18n="register_btn">Register Citizen Account</span>
+            </button>
+          </form>
+
+          <div class="auth-footer" style="margin-top: 1.25rem;">
+            <span data-i18n="already_account">Already have an account?</span>
+            <a href="#" id="back-to-login-btn" style="font-weight: 700; margin-left: 0.35rem;">
+              <i class="fas fa-arrow-left"></i> <span data-i18n="back_to_signin">Back to Sign In</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Switch to Another Portal Link -->
+        <div class="auth-switch-portal" style="margin-top: 1.25rem; text-align: center; font-size: 0.82rem; border-top: 1px solid var(--border-color); padding-top: 0.85rem;">
+          <span style="color: var(--text-muted);" data-i18n="need_diff_portal">Need a different portal?</span>
+          <a href="landing.html" style="color: var(--primary); font-weight: 600; margin-left: 0.35rem; text-decoration: none;">
+            <i class="fas fa-th-large"></i> <span data-i18n="go_portal_hub">Go to Portal Selection Hub</span>
+          </a>
+        </div>
+
+      </div>
+    </section>
+    <section id="beneficiary-dashboard" class="dashboard-grid" style="display: none;">
+      <!-- Dashboard Navigation Back Bar -->
+      <div style="grid-column: span 4; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+        <button class="dashboard-nav-back-btn" id="ben-dash-back-btn">
+          <i class="fas fa-arrow-left"></i> <span data-i18n="back_to_hub">Back to Portal Hub</span>
+        </button>
+        <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">
+          <i class="fas fa-users" style="color: var(--primary);"></i> <span data-i18n="citizen_portal_name">Citizen (User) Portal</span>
+        </span>
+      </div>
+
+      <!-- Welcome Profile Widget -->
+      <div class="glass-card col-span-4 kpi-card">
+        <div class="avatar-circle" id="ben-avatar">B</div>
+        <div class="profile-info">
+          <h3><span data-i18n="welcome">Welcome</span>, <span id="ben-name-display">Beneficiary Name</span></h3>
+          <p><strong data-i18n="label_ration_number">Ration No:</strong> <span id="ben-ration-display">RATIONXXXX</span> | <span class="ration-badge" id="ben-card-badge">PHH</span></p>
+
+        </div>
+      </div>
+
+
+
+      <!-- Booking Actions & Queue Estimator -->
+      <div class="glass-card col-span-4">
+        <div class="card-header-flex">
+          <div>
+            <h3 class="card-title" data-i18n="action_title"><i class="fas fa-calendar-alt"></i> Slot Management</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.25rem 0 0.5rem 0;">
+              Active slots pending check-in. Slots can be rescheduled anytime until checked in by the dealer.
+            </p>
+          </div>
+        </div>
+
+        
+        <!-- Live status of current/upcoming booking -->
+        <div id="upcoming-booking-box">
+          <!-- Dynamically populated -->
+        </div>
+
+        <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+          <button class="btn-primary" id="open-booking-modal-btn" data-i18n="book_new_slot" style="flex: 1;">
+            <i class="fas fa-plus-circle"></i> Book New Ration Slot
+          </button>
+          <button class="btn-secondary" id="open-reschedule-btn" style="flex: 1; display: none; background-color: var(--status-missed-text); color: white; border: none;">
+            <i class="fas fa-calendar-check"></i> Reschedule Missed Slot
+          </button>
+        </div>
+      </div>
+
+      <!-- Historical Bookings -->
+      <div class="glass-card col-span-4">
+        <div class="card-header-flex">
+          <h3 class="card-title" data-i18n="history_title"><i class="fas fa-history"></i> Booking History & Receipts</h3>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="receipt-details-table" style="width: 100%;">
+            <thead>
+              <tr style="font-weight: bold; border-bottom: 2px solid var(--border-color);">
+                <td data-i18n="booking_id">Booking ID</td>
+                <td data-i18n="date">Date</td>
+                <td data-i18n="time">Time Slot</td>
+                <td data-i18n="status">Status</td>
+                <td data-i18n="actions">Actions</td>
+              </tr>
+            </thead>
+            <tbody id="ben-history-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- DEALER PORTAL DASHBOARD -->
+    <!-- ========================================== -->
+    <section id="dealer-dashboard" class="dashboard-grid" style="display: none;">
+      <!-- Dashboard Navigation Back Bar -->
+      <div style="grid-column: span 4; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+        <button class="dashboard-nav-back-btn" id="dealer-dash-back-btn">
+          <i class="fas fa-arrow-left"></i> <span data-i18n="back_to_hub">Back to Portal Hub</span>
+        </button>
+        <span style="font-size: 0.85rem; color: #10b981; font-weight: 600;">
+          <i class="fas fa-store"></i> <span data-i18n="dealer_portal_name">FPS Dealer Portal</span>
+        </span>
+      </div>
+
+      <!-- Welcome Dealer Panel -->
+      <div class="glass-card col-span-4 kpi-card">
+        <div class="kpi-icon blue"><i class="fas fa-store"></i></div>
+        <div class="profile-info">
+          <h3><span data-i18n="dealer_portal">Dealer Portal</span> | <span id="dealer-name-display">Dealer Name</span></h3>
+          <p><strong data-i18n="label_shop_code">Shop Code:</strong> <span id="dealer-shop-code">PDS-XXXX</span> | <span id="dealer-shop-name">Ameerpet Shop</span></p>
+        </div>
+      </div>
+
+      <!-- KPI Summary Row -->
+      <div class="glass-card kpi-card">
+        <div class="kpi-icon blue"><i class="fas fa-users"></i></div>
+        <div class="kpi-data">
+          <h3 id="dealer-kpi-booked">0</h3>
+          <p data-i18n="today_booked">Today's Bookings</p>
+        </div>
+      </div>
+      <div class="glass-card kpi-card">
+        <div class="kpi-icon green"><i class="fas fa-check-circle"></i></div>
+        <div class="kpi-data">
+          <h3 id="dealer-kpi-completed">0</h3>
+          <p data-i18n="today_distributed">Completed</p>
+        </div>
+      </div>
+      <div class="glass-card kpi-card">
+        <div class="kpi-icon orange"><i class="fas fa-clock"></i></div>
+        <div class="kpi-data">
+          <h3 id="dealer-kpi-pending">0</h3>
+          <p data-i18n="pending_users">Pending check-ins</p>
+        </div>
+      </div>
+      <div class="glass-card kpi-card">
+        <div class="kpi-icon red"><i class="fas fa-exclamation-triangle"></i></div>
+        <div class="kpi-data">
+          <h3 id="dealer-kpi-missed">0</h3>
+          <p data-i18n="missed_users">Missed slots</p>
+        </div>
+      </div>
+
+      <!-- QR Code Scanning / Check-in Portal -->
+      <div class="glass-card col-span-2">
+        <div class="card-header-flex">
+          <h3 class="card-title" data-i18n="qr_checkin_title"><i class="fas fa-qrcode"></i> QR Verification & Check-in</h3>
+        </div>
+        
+        <!-- Camera QR scanner box -->
+        <div id="qr-scanner-view" style="display: none; margin-bottom: 1rem;">
+          <div id="qr-reader"></div>
+          <button class="btn-secondary" id="stop-qr-scanner-btn" style="margin-top: 1rem; width: 100%;">Stop Scanner</button>
+        </div>
+
+        <div id="qr-scanner-controls">
+          <button class="btn-primary" id="start-qr-scanner-btn" style="margin-bottom: 1rem;">
+            <i class="fas fa-camera"></i> Scan Beneficiary QR Code
+          </button>
+          
+          <div style="text-align: center; margin: 0.5rem 0;" data-i18n="or">-- OR --</div>
+          
+          <!-- Manual QR checkin (Highly useful for testing when cameras aren't connected) -->
+          <div class="form-group">
+            <label for="manual-booking-id-check" data-i18n="manual_booking_id">Enter Booking ID Manually</label>
+            <div style="display: flex; gap: 0.5rem;">
+              <input type="text" id="manual-booking-id-check" class="form-control" placeholder="e.g. B-123456">
+              <button class="btn-primary" id="manual-checkin-btn" style="width: auto;">Verify</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Verification Success/Failure Messages -->
+        <div id="checkin-result-box" style="margin-top: 1rem; display: none;" class="crowd-recommendation">
+          <!-- Populated by verify JS -->
+        </div>
+      </div>
+
+      <!-- Assisted Booking for Elderly / Non-Technical Citizens -->
+      <div class="glass-card col-span-2">
+        <div class="card-header-flex">
+          <h3 class="card-title" data-i18n="assisted_booking_title"><i class="fas fa-hands-helping"></i> Assisted Slot Booking</h3>
+        </div>
+        <form id="assisted-booking-form">
+          <div class="form-group">
+            <label for="assisted-ration" data-i18n="label_ration_number">Beneficiary Q Ration Number</label>
+            <div style="display: flex; gap: 0.5rem;">
+              <input type="text" id="assisted-ration" class="form-control" required placeholder="e.g. RATION888">
+              <button type="button" class="btn-secondary" id="assisted-verify-btn" data-i18n="verify">Book Slot</button>
+            </div>
+          </div>
+
+          <div id="assisted-form-details" style="display: none;">
+            <div class="form-group">
+              <label data-i18n="label_full_name">Beneficiary Name</label>
+              <input type="text" id="assisted-name" class="form-control" readonly>
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label data-i18n="date">Select Date</label>
+                <input type="date" id="assisted-date" class="form-control" required>
+              </div>
+              <div class="form-group">
+                <label data-i18n="time">Select Time Slot</label>
+                <select id="assisted-timeslot" class="form-control" required>
+                  <!-- Populated dynamically -->
+                </select>
+              </div>
+            </div>
+
+            <!-- Priority Category Assist Alert -->
+            <div class="crowd-recommendation" style="background-color: var(--primary-glow); border-color: var(--primary); margin-bottom: 1rem;" id="assisted-priority-notice">
+              <i class="fas fa-info-circle"></i> <span data-i18n="elderly_notice">Note: Senior Citizens/Disabled beneficiaries are flagged for expedited queues at check-in.</span>
+            </div>
+
+            <button type="submit" class="btn-primary" data-i18n="create_booking">Create Booking</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Current Distribution Panel (Becomes active after user check-in) -->
+      <div class="glass-card col-span-4" id="distribution-panel" style="display: none; border: 2px solid var(--primary); box-shadow: var(--shadow-glow);">
+        <div class="card-header-flex">
+          <h3 class="card-title" data-i18n="distribute_ration_title"><i class="fas fa-dolly"></i> Record Ration Distribution</h3>
+          <button class="control-btn" id="close-distribution-btn"><i class="fas fa-times"></i></button>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem;">
+          <div>
+            <h4 data-i18n="beneficiary_details">Beneficiary Details</h4>
+            <div class="crowd-recommendation" style="margin-top: 0.5rem; line-height: 1.6;">
+              <p><strong>Name:</strong> <span id="dist-ben-name">Ramesh Kumar</span></p>
+              <p><strong>Ration No:</strong> <span id="dist-ben-ration">RATION999</span></p>
+              <p><strong>Card Type:</strong> <span class="badge status-booked" id="dist-ben-card">PHH</span></p>
+              <p><strong>Booking ID:</strong> <span id="dist-booking-id">B-123456</span></p>
+            </div>
+          </div>
+          <div>
+            <h4 data-i18n="quantities_distributed">Quantities Distributed</h4>
+            <form id="distribution-submit-form" style="margin-top: 0.5rem;">
+              <table class="receipt-details-table" style="margin-bottom: 1rem;">
+                <thead>
+                  <tr style="font-weight: bold;">
+                    <td>Commodity</td>
+                    <td>Allocated Quota</td>
+                    <td>Distributed Quantity</td>
+                  </tr>
+                </thead>
+                <tbody id="distribution-commodities-tbody">
+                  <!-- Loaded dynamically based on beneficiary quota -->
+                </tbody>
+              </table>
+              <button type="submit" class="btn-primary" data-i18n="distribute_btn">Confirm & Distribute Ration</button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Today's Queue / Bookings List -->
+      <div class="glass-card col-span-4">
+        <div class="card-header-flex">
+          <h3 class="card-title" data-i18n="todays_queue"><i class="fas fa-list-ol"></i> Upcoming Queue & Booking Registry</h3>
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="text" id="dealer-search-queue" class="form-control" style="width: 200px; padding: 0.4rem;" placeholder="Search Ration/Name...">
+            <select id="dealer-filter-status" class="lang-select">
+              <option value="ALL">All Statuses</option>
+              <option value="BOOKED">BOOKED</option>
+              <option value="CHECKED_IN">CHECKED-IN</option>
+              <option value="COMPLETED">COMPLETED</option>
+              <option value="MISSED">MISSED</option>
+              <option value="RESCHEDULED">RESCHEDULED</option>
+            </select>
+          </div>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="receipt-details-table" style="width: 100%;">
+            <thead>
+              <tr style="font-weight: bold; border-bottom: 2px solid var(--border-color);">
+                <td>Booking ID</td>
+                <td>Date</td>
+                <td>Ration Number</td>
+                <td>Name</td>
+                <td>Time Slot</td>
+                <td>Status</td>
+                <td>Actions</td>
+              </tr>
+            </thead>
+            <tbody id="dealer-queue-tbody">
+              <!-- Loaded dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Dealer Stock Management -->
+      <div class="glass-card col-span-2">
+        <div class="card-header-flex">
+          <h3 class="card-title" data-i18n="stock_mgmt_title"><i class="fas fa-boxes-stacked"></i> Shop Stock Intake</h3>
+        </div>
+        <form id="stock-intake-form">
+          <div class="form-group">
+            <label for="stock-commodity" data-i18n="commodity">Select Commodity</label>
+            <select id="stock-commodity" class="form-control">
+              <option value="1">Rice (kg)</option>
+              <option value="2">Wheat (kg)</option>
+              <option value="3">Sugar (kg)</option>
+              <option value="4">Kerosene (L)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="stock-quantity" data-i18n="quantity">Quantity Received</label>
+            <input type="number" id="stock-quantity" class="form-control" step="0.1" required min="1" placeholder="e.g. 500">
+          </div>
+          <div class="form-group">
+            <label for="stock-ref" data-i18n="gov_supply_ref">Government Supply Reference Code</label>
+            <input type="text" id="stock-ref" class="form-control" required placeholder="e.g. GOV-SUPP-XXXX">
+          </div>
+          <button type="submit" id="stock-submit-btn" class="btn-primary" data-i18n="add_stock_btn">Record Stock Intake</button>
+          <div id="stock-intake-feedback" style="margin-top: 0.75rem; display: none;"></div>
+        </form>
+      </div>
+
+      <!-- Interactive Dealer Analytics -->
+      <div class="glass-card col-span-2">
+        <div class="card-header-flex">
+          <h3 class="card-title"><i class="fas fa-chart-line"></i> Stock Intake & Distribution Analytics</h3>
+          <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 0.75rem; font-weight: 600;"><i class="fas fa-bolt"></i> Live Real-Time</span>
+        </div>
+        <div id="dealer-last-intake-info" style="font-size: 0.8rem; color: #6366f1; font-weight: 600; margin-bottom: 0.4rem; display: none;"></div>
+        <!-- Canvas for charts -->
+        <canvas id="dealerChart" style="max-height: 250px;"></canvas>
+      </div>
+
+      <!-- Live Crowd Monitoring (Dealer) -->
+      <div class="glass-card col-span-4" id="dealer-crowd-monitor-card">
+        <div class="card-header-flex">
+          <h3 class="card-title"><i class="fas fa-video"></i> Live Crowd Monitoring — Shop Floor</h3>
+          <div style="display:flex; gap:0.5rem; align-items:center;">
+            <div class="crowd-live-dot" id="dealer-crowd-live-dot"></div>
+            <span class="crowd-live-label" id="dealer-crowd-live-label">Offline</span>
+          </div>
+        </div>
+
+        <div class="crowd-monitor-layout">
+          <!-- Video + Canvas overlay -->
+          <div class="crowd-video-wrapper">
+            <video id="dealer-crowd-video" class="crowd-video" autoplay muted playsinline></video>
+            <canvas id="dealer-crowd-canvas" class="crowd-canvas"></canvas>
+            <div class="crowd-count-overlay" id="dealer-crowd-count-overlay">
+              <span class="crowd-count-num" id="dealer-crowd-count">0</span>
+              <span class="crowd-count-lbl">Persons</span>
+            </div>
+          </div>
+
+          <!-- Right Panel -->
+          <div class="crowd-info-panel">
+            <div class="crowd-stat-box" id="dealer-crowd-status-box">
+              <div class="crowd-status-icon" id="dealer-crowd-status-icon"><i class="fas fa-circle-question"></i></div>
+              <div>
+                <div class="crowd-status-title" id="dealer-crowd-status-title">Camera Off</div>
+                <div class="crowd-status-sub" id="dealer-crowd-status-sub">Start monitoring to see live crowd level</div>
+              </div>
+            </div>
+
+            <div class="crowd-meter-wrap">
+              <div class="crowd-meter-label">Crowd Level</div>
+              <div class="crowd-meter-bar">
+                <div class="crowd-meter-fill" id="dealer-crowd-meter-fill" style="width:0%"></div>
+              </div>
+              <div class="crowd-meter-scale"><span>Low</span><span>Moderate</span><span>High</span></div>
+            </div>
+
+            <div class="crowd-history-box">
+              <div class="crowd-history-title"><i class="fas fa-clock-rotate-left"></i> Recent Count Log</div>
+              <ul class="crowd-history-list" id="dealer-crowd-history"></ul>
+            </div>
+
+            <div style="display:flex; gap:0.75rem; margin-top:auto;">
+              <button class="btn-primary" id="dealer-start-crowd-btn" style="flex:1;">
+                <i class="fas fa-play-circle"></i> Start Monitoring
+              </button>
+              <button class="btn-secondary" id="dealer-stop-crowd-btn" style="flex:1; display:none;">
+                <i class="fas fa-stop-circle"></i> Stop
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- GOVERNMENT / ADMIN PORTAL DASHBOARD -->
+    <!-- ========================================== -->
+    <section id="admin-dashboard" class="dashboard-grid" style="display: none;">
+      <!-- Dashboard Navigation Back Bar -->
+      <div style="grid-column: span 4; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+        <button class="dashboard-nav-back-btn" id="admin-dash-back-btn">
+          <i class="fas fa-arrow-left"></i> <span data-i18n="back_to_hub">Back to Portal Hub</span>
+        </button>
+        <span style="font-size: 0.85rem; color: #f59e0b; font-weight: 600;">
+          <i class="fas fa-landmark"></i> <span data-i18n="admin_portal_name">Government Admin Portal</span>
+        </span>
+      </div>
+      
+      <!-- Selector & Filters Panel -->
+      <div class="glass-card col-span-4 card-header-flex" style="flex-wrap: wrap; gap: 1rem;">
+        <div class="logo-container">
+          <div class="kpi-icon orange" style="width: 38px; height: 38px;"><i class="fas fa-shield-halved"></i></div>
+          <h3>Civil Supplies Monitoring Panel</h3>
+        </div>
+        
+        <!-- State, District, Mandal Filters -->
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <select id="admin-state-filter" class="lang-select">
+            <option value="ALL">All States</option>
+          </select>
+          <select id="admin-district-filter" class="lang-select">
+            <option value="ALL">All Districts</option>
+          </select>
+          <select id="admin-mandal-filter" class="lang-select">
+            <option value="ALL">All Regions</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Admin KPI Counters -->
+      <div class="glass-card kpi-card">
+        <div class="kpi-icon blue"><i class="fas fa-store"></i></div>
+        <div class="kpi-data">
+          <h3 id="admin-kpi-shops">0</h3>
+          <p>Total Shops</p>
+        </div>
+      </div>
+      <div class="glass-card kpi-card">
+        <div class="kpi-icon green"><i class="fas fa-users"></i></div>
+        <div class="kpi-data">
+          <h3 id="admin-kpi-beneficiaries">0</h3>
+          <p>Beneficiaries</p>
+        </div>
+      </div>
+      <div class="glass-card kpi-card">
+        <div class="kpi-icon orange"><i class="fas fa-receipt"></i></div>
+        <div class="kpi-data">
+          <h3 id="admin-kpi-bookings">0</h3>
+          <p>Booked Slots</p>
+        </div>
+      </div>
+      <div class="glass-card kpi-card">
+        <div class="kpi-icon red"><i class="fas fa-triangle-exclamation"></i></div>
+        <div class="kpi-data">
+          <h3 id="admin-kpi-completed">0</h3>
+          <p>Completed Distributions</p>
+        </div>
+      </div>
+
+      <!-- Visual Supply vs Distribution Charts -->
+      <div class="glass-card col-span-2">
+        <h3 class="card-title" style="margin-bottom: 1rem;"><i class="fas fa-chart-pie"></i> Commodity Supply vs Distribution</h3>
+        <canvas id="adminSupplyChart" style="max-height: 250px;"></canvas>
+      </div>
+
+      <div class="glass-card col-span-2">
+        <h3 class="card-title" style="margin-bottom: 1rem;"><i class="fas fa-chart-bar"></i> Shop-wise Booking Completion Rate</h3>
+        <canvas id="adminCompletionChart" style="max-height: 250px;"></canvas>
+      </div>
+
+      <!-- Ration Shop Database CRUD -->
+      <div class="glass-card col-span-2">
+        <div class="card-header-flex">
+          <h3 class="card-title"><i class="fas fa-store-alt"></i> Manage Ration Shops</h3>
+          <button class="btn-primary" id="admin-add-shop-btn" style="width: auto; padding: 0.4rem 0.8rem;"><i class="fas fa-plus"></i> Add Shop</button>
+        </div>
+        <div style="overflow-y: auto; max-height: 300px;">
+          <table class="receipt-details-table">
+            <thead>
+              <tr style="font-weight: bold;">
+                <td>Shop Name</td>
+                <td>Code</td>
+                <td>Location</td>
+                <td>Actions</td>
+              </tr>
+            </thead>
+            <tbody id="admin-shops-tbody">
+              <!-- Loaded dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Suspicious Flags Logs -->
+      <div class="glass-card col-span-2">
+        <div class="card-header-flex">
+          <h3 class="card-title"><i class="fas fa-shield-virus text-danger"></i> Suspicious / Discrepancy Alerts</h3>
+        </div>
+        <div id="admin-alerts-list" style="display: flex; flex-direction: column; gap: 0.75rem; overflow-y: auto; max-height: 300px;">
+          <!-- Loaded dynamically -->
+        </div>
+      </div>
+
+      <!-- System Audit Logs -->
+      <div class="glass-card col-span-4">
+        <div class="card-header-flex">
+          <h3 class="card-title"><i class="fas fa-list-check"></i> System Audit Logs</h3>
+          <button class="btn-secondary" id="admin-export-audit-btn"><i class="fas fa-download"></i> Export Excel/PDF</button>
+        </div>
+        <div style="overflow-x: auto; max-height: 250px;">
+          <table class="receipt-details-table">
+            <thead>
+              <tr style="font-weight: bold;">
+                <td>Timestamp</td>
+                <td>Action</td>
+                <td>Performed By</td>
+                <td>Details</td>
+              </tr>
+            </thead>
+            <tbody id="admin-audit-tbody">
+              <!-- Loaded dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+
+
+    </section>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- AI CHATBOT SYSTEM -->
+  <!-- ========================================== -->
+  <div class="chatbot-trigger" id="chat-trigger-btn">
+    <i class="fas fa-robot"></i>
+  </div>
+
+  <div class="chat-window" id="chat-window-box">
+    <div class="chat-header">
+      <div class="chat-header-title-box">
+        <h3><i class="fas fa-robot"></i> <span data-i18n="bot_title">PDS Sahayak (AI Assistant)</span></h3>
+        <span class="chat-live-badge"><span class="chat-live-pulse"></span> Live 24x7</span>
+      </div>
+      <button class="control-btn" id="close-chat-btn" style="color: white; background: none; border: none; font-size: 1.1rem; cursor: pointer;"><i class="fas fa-times"></i></button>
+    </div>
+    
+    <div class="chat-messages" id="chat-messages-container">
+      <!-- Dynamic greeting will be rendered -->
+    </div>
+
+    <!-- Quick Reply Buttons -->
+    <div class="chat-quick-replies" id="chat-quick-replies-box">
+      <!-- Loaded dynamically based on language -->
+    </div>
+
+    <!-- Free-text query form with speech recognition -->
+    <form class="chat-input-area" id="chat-input-form">
+      <button type="button" class="chat-mic-btn" id="chat-mic-btn" title="Speak your query in real-time">
+        <i class="fas fa-microphone"></i>
+      </button>
+      <input type="text" id="chat-input-text" class="form-control" placeholder="Ask any doubt in English, Hindi, or Telugu..." required autocomplete="off">
+      <button type="submit" class="btn-primary" style="width: auto; padding: 0.5rem 1rem;" title="Send"><i class="fas fa-paper-plane"></i></button>
+    </form>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- DIALOG MODALS -->
+  <!-- ========================================== -->
+  
+  <!-- Booking / Rescheduling Modal -->
+  <div class="modal-overlay" id="booking-modal">
+    <div class="modal-content" style="max-width: 600px;">
+      <span class="close-modal" id="close-booking-modal">&times;</span>
+      <h3 class="card-title" id="booking-modal-title" style="margin-bottom: 1.5rem;"><i class="fas fa-calendar-plus"></i> Select Date & Time Slot</h3>
+      
+      <div class="booking-container">
+        <!-- 1. Select Date -->
+        <div>
+          <h4 style="margin-bottom: 0.5rem;" data-i18n="select_date">1. Select Booking Date</h4>
+          <div class="date-grid" id="modal-date-grid">
+            <!-- Dynamically populated dates -->
+          </div>
+        </div>
+
+        <!-- 2. Select Time Slot -->
+        <div>
+          <h4 style="margin-bottom: 0.5rem;" data-i18n="select_time">2. Select Time Slot & Estimate Crowd</h4>
+          <div class="slots-grid" id="modal-slots-grid">
+            <!-- Dynamically populated slots -->
+          </div>
+
+          <!-- Crowd Estimation Indicator -->
+          <div class="crowd-indicator" id="modal-crowd-indicator" style="display: none; margin-top: 1rem;">
+            <div class="crowd-text">
+              <span id="modal-crowd-level" style="font-weight: 700;">LOW CROWD</span>
+              <span id="modal-crowd-waiting" style="color: var(--text-muted);">~2 mins waiting</span>
+            </div>
+            <div class="crowd-meter">
+              <div class="crowd-fill low" id="modal-crowd-fill"></div>
+            </div>
+            <div class="crowd-recommendation" id="modal-crowd-rec" style="margin-top: 0.5rem;">
+              Low crowd - suitable time to visit.
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+          <button type="button" class="btn-secondary modal-back-btn" id="close-booking-back-btn">
+            <i class="fas fa-arrow-left"></i> <span data-i18n="back_btn">Back</span>
+          </button>
+          <button class="btn-primary" id="confirm-booking-submit-btn" style="flex: 1;" data-i18n="confirm_booking">Confirm Booking</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QR / Booking Receipt Modal -->
+  <div class="modal-overlay" id="receipt-modal">
+    <div class="modal-content">
+      <span class="close-modal" id="close-receipt-modal">&times;</span>
+      <div class="receipt-layout" id="printable-receipt">
+        <div class="receipt-header">
+          <h2 data-i18n="receipt_title">RATION BOOKING RECEIPT</h2>
+          <p data-i18n="header_subtitle">Govt. Public Distribution System</p>
+        </div>
+        
+        <div class="receipt-qr" id="receipt-qr-code">
+          <!-- QRCode.js renders here -->
+        </div>
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: -0.75rem; margin-bottom: 1rem;" data-i18n="qr_scanning_notice">Dealer must scan this QR code for check-in</p>
+
+        <table class="receipt-details-table">
+          <tr>
+            <td class="label" data-i18n="booking_id">Booking ID</td>
+            <td class="value" id="receipt-booking-id">B-123456</td>
+          </tr>
+          <tr>
+            <td class="label" data-i18n="ration_number">Ration Number</td>
+            <td class="value" id="receipt-ration-number">RATION999</td>
+          </tr>
+          <tr>
+            <td class="label" data-i18n="date">Booking Date</td>
+            <td class="value" id="receipt-date">2026-08-30</td>
+          </tr>
+          <tr>
+            <td class="label" data-i18n="time">Time Slot</td>
+            <td class="value" id="receipt-timeslot">10:00 - 11:00</td>
+          </tr>
+          <tr>
+            <td class="label" data-i18n="shop_name">Ration Shop</td>
+            <td class="value" id="receipt-shop-name">Ameerpet Shop #101</td>
+          </tr>
+        </table>
+        
+        <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+          <button type="button" class="btn-secondary modal-back-btn" id="close-receipt-back-btn">
+            <i class="fas fa-arrow-left"></i> <span data-i18n="back_btn">Back</span>
+          </button>
+          <button class="btn-primary" onclick="window.print()" style="flex: 1;"><i class="fas fa-print"></i> <span data-i18n="print_receipt">Print Receipt</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Add/Edit Shop Modal -->
+  <div class="modal-overlay" id="shop-modal">
+    <div class="modal-content">
+      <span class="close-modal" id="close-shop-modal">&times;</span>
+      <h3 class="card-title" id="shop-modal-title" style="margin-bottom: 1.5rem;">Add Ration Shop</h3>
+      <form id="admin-shop-form">
+        <input type="hidden" id="shop-form-id">
+        <div class="form-group">
+          <label for="shop-form-name">Shop Name</label>
+          <input type="text" id="shop-form-name" class="form-control" required placeholder="e.g. Ameerpet PDS Shop #102">
+        </div>
+        <div class="form-group">
+          <label for="shop-form-code">Shop Code</label>
+          <input type="text" id="shop-form-code" class="form-control" required placeholder="e.g. PDS-500017">
+        </div>
+        <div class="form-group">
+          <label for="shop-form-location">Location Ward/Area</label>
+          <select id="shop-form-location" class="form-control">
+            <option value="1">Ameerpet Ward 5</option>
+            <option value="2">Gachibowli Area</option>
+            <option value="3">Gajuwaka Ward 12</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="shop-form-address">Address</label>
+          <input type="text" id="shop-form-address" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label for="shop-form-contact">Contact Number</label>
+          <input type="text" id="shop-form-contact" class="form-control" required>
+        </div>
+        <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+          <button type="button" class="btn-secondary modal-back-btn" id="close-shop-back-btn">
+            <i class="fas fa-arrow-left"></i> <span data-i18n="back_btn">Back</span>
+          </button>
+          <button type="submit" class="btn-primary" style="flex: 1;">Save Shop</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Forgot Password / OTP Modal -->
+  <div class="modal-overlay" id="forgot-password-modal">
+    <div class="modal-content" style="max-width: 440px;">
+      <span class="close-modal" id="close-forgot-modal">&times;</span>
+      <h3 class="card-title" style="margin-bottom: 0.5rem;"><i class="fas fa-key"></i> <span data-i18n="forgot_title">Password Recovery</span></h3>
+      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem;" data-i18n="forgot_desc">
+        Reset your portal password via mobile OTP verification.
+      </p>
+
+      <div id="forgot-step-1">
+        <div class="form-group">
+          <label for="forgot-username" data-i18n="label_forgot_user">Ration Card No / User ID</label>
+          <input type="text" class="form-control" id="forgot-username" placeholder="e.g. RATION999" required>
+        </div>
+        <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+          <button type="button" class="btn-secondary modal-back-btn" id="close-forgot-back-btn">
+            <i class="fas fa-arrow-left"></i> <span data-i18n="back_btn">Back</span>
+          </button>
+          <button type="button" class="btn-primary" id="send-otp-btn" style="flex: 1;">
+            <i class="fas fa-paper-plane"></i> <span data-i18n="send_otp">Send OTP to Registered Mobile</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="forgot-step-2" style="display: none;">
+        <div class="form-group">
+          <label for="forgot-otp" data-i18n="enter_otp">6-Digit OTP</label>
+          <input type="text" class="form-control" id="forgot-otp" placeholder="Enter 6-digit OTP" maxlength="6">
+          <small id="simulated-otp-hint" style="color: var(--primary); font-size: 0.78rem; font-weight: 600; display: block; margin-top: 0.25rem;"></small>
+        </div>
+        <div class="form-group">
+          <label for="forgot-new-password" data-i18n="new_password">New Password</label>
+          <input type="password" class="form-control" id="forgot-new-password" placeholder="Min 6 characters" minlength="6">
+        </div>
+        <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+          <button type="button" class="btn-secondary modal-back-btn" id="forgot-step2-back-btn">
+            <i class="fas fa-arrow-left"></i> <span data-i18n="back_btn">Back</span>
+          </button>
+          <button type="button" class="btn-primary" id="reset-password-btn" style="flex: 1;">
+            <i class="fas fa-check-circle"></i> <span data-i18n="reset_password">Reset Password & Sign In</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer style="text-align: center; padding: 2rem; border-top: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.8rem; margin-top: 3rem;">
+    &copy; 2026 Ministry of Consumer Affairs, Food & Public Distribution. All Rights Reserved.
+  </footer>
+
+  <!-- Multilingual Engine & Global Navigation -->
+  <script src="i18n.js"></script>
+  <!-- App Main Javascript Logic -->
+  <script src="app.js?v=3"></script>
+  <!-- Real-time AI Assistant Engine -->
+  <script src="chatbot.js"></script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "name": "Smart Ration Slot Booking & PDS Management System",
+  "short_name": "Smart PDS",
+  "description": "Public Distribution System Slot Booking and Queue Management",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#1e3a8a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3050/3050241.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

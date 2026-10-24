@@ -1,0 +1,17 @@
+{
+  "name": "smart-ration-system",
+  "version": "1.0.0",
+  "description": "Smart Ration Slot Booking & PDS Management System",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "node backend/server.js",
+    "ml": "python ml_service/app.py",
+    "test:db": "node backend/test_db.js",
+    "test:ml": "python ml_service/test_ml.py"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.118.0"
+  }
+}

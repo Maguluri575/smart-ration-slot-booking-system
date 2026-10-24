@@ -1,0 +1,9 @@
+{
+  "name": "smart-ration-frontend",
+  "version": "1.0.0",
+  "description": "Smart Ration Slot Booking Frontend",
+  "scripts": {
+    "start": "node ../backend/server.js",
+    "dev": "node ../backend/server.js"
+  }
+}
