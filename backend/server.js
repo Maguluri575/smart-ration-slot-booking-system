@@ -198,12 +198,8 @@ app.post('/api/auth/verify-otp', async (req, res) => {
     const salt = bcrypt.genSaltSync(10);
     const newHash = bcrypt.hashSync(newPassword, salt);
 
-    const sqlite3 = require('sqlite3').verbose();
-    const sqliteDb = new sqlite3.Database(path.resolve(__dirname, 'ration_booking.db'));
-    sqliteDb.run("UPDATE users SET password_hash = ? WHERE id = ?", [newHash, user.id], (err) => {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json({ message: 'Password reset successful. Please log in.' });
-    });
+    await db.updateUserPassword(user.id, newHash);
+    res.json({ message: 'Password reset successful. Please log in.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -555,20 +551,25 @@ app.post('/api/ml/predict', async (req, res) => {
 });
 
 // Notification marker
-app.post('/api/notifications/mark-read', authenticateToken, (req, res) => {
-  const sqlite3 = require('sqlite3').verbose();
-  const sqliteDb = new sqlite3.Database(path.resolve(__dirname, 'ration_booking.db'));
-  sqliteDb.run("UPDATE notifications SET is_read = 1 WHERE user_id = ?", [req.user.userId], (err) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true });
-  });
+app.post('/api/notifications/mark-read', authenticateToken, async (req, res) => {
+  try {
+    const result = await db.markNotificationsRead(req.user.userId);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Initialize database schema and start server
-db.initDb().then(() => {
-  server.listen(PORT, () => {
-    console.log(`Smart PDS Server running locally on: http://localhost:${PORT}`);
+// Initialize database schema and start server when run directly (not required as a module)
+if (require.main === module) {
+  db.initDb().then(() => {
+    server.listen(PORT, () => {
+      console.log(`Smart PDS Server running locally on: http://localhost:${PORT}`);
+    });
+  }).catch(err => {
+    console.error("Failed to initialize database: ", err);
   });
-}).catch(err => {
-  console.error("Failed to initialize database: ", err);
-});
+}
+
+// Export Express app for serverless platforms (Vercel)
+module.exports = app;

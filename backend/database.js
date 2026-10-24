@@ -1,4 +1,11 @@
-const sqlite3 = require('sqlite3').verbose();
+let sqlite3 = null;
+try {
+  sqlite3 = require('sqlite3').verbose();
+} catch (e) {
+  // Gracefully handle environments (like serverless Vercel) where native sqlite3 addon is not available
+  console.warn("Notice: sqlite3 binary not loaded in current environment:", e.message);
+}
+
 const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
@@ -39,8 +46,16 @@ if (useSupabase) {
   if (process.env.SUPABASE_URL && isPlaceholderKey(process.env.SUPABASE_KEY)) {
     console.log("Notice: Supabase credentials contain a placeholder key. Operating on local SQLite until actual Supabase key is provided in .env.");
   }
-  console.log(`Database Mode: SQLite (${dbPath})`);
-  sqliteDb = new sqlite3.Database(dbPath);
+  if (sqlite3) {
+    console.log(`Database Mode: SQLite (${dbPath})`);
+    try {
+      sqliteDb = new sqlite3.Database(dbPath);
+    } catch (e) {
+      console.warn("Could not open local SQLite database:", e.message);
+    }
+  } else {
+    console.warn("Notice: SQLite is unavailable in this environment and Supabase credentials are not configured.");
+  }
 }
 
 // Promisify SQLite helpers (guarded for safety if sqliteDb is disconnected)
@@ -2384,6 +2399,28 @@ async function getAuditLogs() {
   return await dbAll("SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 50");
 }
 
+async function updateUserPassword(userId, newPasswordHash) {
+  if (useSupabase) {
+    const { error } = await supabase.from('users').update({ password_hash: newPasswordHash }).eq('id', userId);
+    if (error) throw error;
+    return { success: true };
+  }
+  if (!sqliteDb) return { success: true };
+  await dbRun("UPDATE users SET password_hash = ? WHERE id = ?", [newPasswordHash, userId]);
+  return { success: true };
+}
+
+async function markNotificationsRead(userId) {
+  if (useSupabase) {
+    const { error } = await supabase.from('notifications').update({ is_read: 1 }).eq('user_id', userId);
+    if (error) throw error;
+    return { success: true };
+  }
+  if (!sqliteDb) return { success: true };
+  await dbRun("UPDATE notifications SET is_read = 1 WHERE user_id = ?", [userId]);
+  return { success: true };
+}
+
 module.exports = {
   initDb,
   registerUser,
@@ -2411,5 +2448,7 @@ module.exports = {
   deleteRationShop,
   getDealersWithShopInfo,
   getAuditLogs,
-  getNotifications
+  getNotifications,
+  updateUserPassword,
+  markNotificationsRead
 };

@@ -11,7 +11,17 @@
     "test:ml": "python ml_service/test_ml.py"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.12.7",
-    "@supabase/supabase-js": "^2.118.0"
+    "@supabase/supabase-js": "^2.39.8",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.23.1",
+    "socket.io": "^4.7.5",
+    "uuid": "^9.0.1"
+  },
+  "optionalDependencies": {
+    "sqlite3": "^5.1.7"
   }
 }
